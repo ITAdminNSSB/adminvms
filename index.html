@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Today's Registrations</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+        h2 {
+            color: #4CAF50;
+        }
+        .date-controls {
+            margin: 1rem 0;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .date-input {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .today-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .today-btn:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .clock-out-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .clock-out-btn:hover {
+            background-color: #45a049;
+        }
+        .clock-out-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: #f44336;
+            padding: 1rem;
+            margin: 1rem 0;
+            border: 1px solid #f44336;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            color: #4CAF50;
+            padding: 1rem;
+            margin: 1rem 0;
+            border: 1px solid #4CAF50;
+            border-radius: 4px;
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            display: none;
+        }
+        .no-data {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h2>Registration Data</h2>
+    <div class="date-controls">
+        <input type="date" id="dateFilter" class="date-input">
+        <button onclick="setToday()" class="today-btn">Today</button>
+    </div>
+    <div id="error" class="error"></div>
+    <div id="success" class="success"></div>
+    <div id="loading" class="loading">Loading...</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Company</th>
+                <th>Phone</th>
+                <th>Purpose</th>
+                <th>Date & Time</th>
+                <th>Clock Out Time</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="registrationData">
+            <!-- Data will be inserted here -->
+        </tbody>
+    </table>
+    <script>
+        const scriptUrl = 'https://script.google.com/macros/s/AKfycbwyCSmSRX9EoAd9XkJ1bFs5iu0vbsIj3b5wTbKdWFaxFAFZSFdLS2HcECg9tVB5SjTO/exec';
+        const errorDiv = document.getElementById('error');
+        const successDiv = document.getElementById('success');
+        const loadingDiv = document.getElementById('loading');
+        const dateFilter = document.getElementById('dateFilter');
+        
+        function setToday() {
+            const today = new Date();
+            dateFilter.value = today.toISOString().split('T')[0];
+            loadRegistrationData();
+        }
+        
+        setToday();
+        dateFilter.addEventListener('change', loadRegistrationData);
+
+        function showMessage(type, message, duration = 3000) {
+            const div = type === 'error' ? errorDiv : successDiv;
+            div.textContent = message;
+            div.style.display = 'block';
+            setTimeout(() => {
+                div.style.display = 'none';
+            }, duration);
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+        }
+
+        // Fixed clockOut function to properly handle the row data
+      // Frontend JavaScript
+function clockOut(rowData, button) {
+    // Convert timestamp to consistent format
+    const timestamp = new Date(rowData.timestamp).toISOString();
+    
+    const data = {
+        name: rowData.name,
+        timestamp: timestamp,
+        clockOutTime: new Date().toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        })
+    };
+
+    button.disabled = true;
+    button.textContent = 'Processing...';
+
+    fetch(scriptUrl, {
+        method: 'POST',
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            const clockOutCell = button.parentElement.previousElementSibling;
+            clockOutCell.textContent = data.clockOutTime;
+            button.parentElement.innerHTML = '<span class="status">Clocked Out</span>';
+            showMessage('success', 'Successfully clocked out!');
+        } else {
+            throw new Error(result.message || 'Failed to clock out');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        button.disabled = false;
+        button.textContent = 'Clock Out';
+        showMessage('error', error.message || 'Network error. Please try again.');
+    });
+}
+
+function loadRegistrationData() {
+    loadingDiv.style.display = 'block';
+    const selectedDate = dateFilter.value;
+
+    fetch(scriptUrl)
+        .then(response => response.json())
+        .then(data => {
+            loadingDiv.style.display = 'none';
+            const tbody = document.getElementById('registrationData');
+            tbody.innerHTML = '';
+            
+            const filteredData = data.filter(row => {
+                const rowDate = new Date(row.timestamp);
+                return formatDate(rowDate) === formatDate(selectedDate);
+            });
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="no-data">No registrations for selected date</td></tr>';
+                return;
+            }
+
+            filteredData.forEach(row => {
+                const tr = document.createElement('tr');
+                const safeRow = {
+                    name: row.name,
+                    timestamp: new Date(row.timestamp).toISOString() // Ensure consistent timestamp format
+                };
+                tr.innerHTML = `
+                    <td>${row.name || '-'}</td>
+                    <td>${row.company || '-'}</td>
+                    <td>${row.phone || '-'}</td>
+                    <td>${row.tujuan || '-'}</td>
+                    <td>${row.timestamp || '-'}</td>
+                    <td>${row.clockOutTime || '-'}</td>
+                    <td>
+                        ${!row.clockOutTime ? 
+                            `<button class="clock-out-btn" onclick='clockOut(${JSON.stringify(safeRow)}, this)'>Clock Out</button>` :
+                            '<span class="status">Clocked Out</span>'
+                        }
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        })
+        .catch(error => {
+            loadingDiv.style.display = 'none';
+            console.error('Error fetching data:', error);
+            showMessage('error', 'Failed to load registration data. Please refresh the page.');
+        });
+}
+    </script>
+</body>
+</html>
